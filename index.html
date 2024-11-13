@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Miva Examination Demo</title>
+    <style>
+        body {
+            font-family: "Lucida Grande", Tahoma, Verdana, Arial, sans-serif;
+            background-color: #f2f2f2;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            width: 700px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #1e4977;
+            font-size: 24px;
+            border-bottom: 1px solid #d8dfea;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .question {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f7f7f7;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        .options {
+            margin-left: 20px;
+        }
+        .option {
+            margin: 10px 0;
+        }
+        #submit-btn {
+            background-color: #3b5998;
+            color: white;
+            padding: 6px 20px;
+            border: 1px solid #2f477a;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            display: block;
+            margin: 20px auto;
+        }
+        #submit-btn:hover {
+            background-color: #2f477a;
+        }
+        #score {
+            text-align: center;
+            font-size: 18px;
+            margin-top: 20px;
+            display: none;
+            color: #1e4977;
+            font-weight: bold;
+        }
+        #spreadsheet-upload {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #eceff5;
+            border: 1px solid #d8dfea;
+            border-radius: 3px;
+        }
+        #spreadsheet-upload button {
+            background-color: #5b74a8;
+            color: white;
+            padding: 6px 20px;
+            border: 1px solid #2f477a;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        #spreadsheet-upload button:hover {
+            background-color: #3b5998;
+        }
+        input[type="radio"] {
+            margin-right: 5px;
+        }
+        label {
+            color: #333;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Multiple Choice Examination</h1>
+        
+        <div id="spreadsheet-upload">
+            <input type="file" id="file-input" accept=".csv,.xlsx,.xls" style="display: none">
+            <button onclick="document.getElementById('file-input').click()">Upload Question Spreadsheet</button>
+            <p style="color: #666; font-size: 11px; margin-top: 10px;">
+                Upload a CSV file containing questions and options
+            </p>
+        </div>
+
+        <div id="exam-container"></div>
+        <button id="submit-btn">Submit Exam</button>
+        <div id="score"></div>
+    </div>
+
+    <script>
+        class Examination {
+            constructor() {
+                this.questions = [];
+                this.selectedQuestions = [];
+                this.score = 0;
+            }
+
+            async parseSpreadsheet(file) {
+                if (file.name.endsWith('.csv')) {
+                    const text = await file.text();
+                    const rows = text.split('\n').map(row => row.split(','));
+                    
+                    this.questions = rows.slice(1).map(row => {
+                        if (row.length < 6) return null;
+                        
+                        return {
+                            question: row[0]?.trim(),
+                            options: [
+                                row[1]?.trim(),
+                                row[2]?.trim(),
+                                row[3]?.trim(),
+                                row[4]?.trim()
+                            ].filter(Boolean),
+                            correctOption: parseInt(row[5]?.trim()) - 1
+                        };
+                    }).filter(Boolean);
+
+                    this.randomizeQuestions();
+                    this.renderExam();
+                } else {
+                    alert('Please upload a CSV file. Each row should contain: Question, Option1, Option2, Option3, Option4, Correct Answer (1-4)');
+                }
+            }
+
+            randomizeQuestions() {
+                const shuffled = [...this.questions].sort(() => Math.random() - 0.5);
+                this.selectedQuestions = shuffled.slice(0, 60);
+                
+                this.selectedQuestions.forEach(question => {
+                    const options = [...question.options];
+                    const correctAnswer = options[question.correctOption];
+                    const shuffledOptions = options.sort(() => Math.random() - 0.5);
+                    question.correctOption = shuffledOptions.indexOf(correctAnswer);
+                    question.options = shuffledOptions;
+                });
+            }
+
+            renderExam() {
+                const container = document.getElementById('exam-container');
+                container.innerHTML = '';
+
+                this.selectedQuestions.forEach((q, qIndex) => {
+                    const questionDiv = document.createElement('div');
+                    questionDiv.className = 'question';
+                    questionDiv.innerHTML = `
+                        <p><strong>Question ${qIndex + 1}:</strong> ${q.question}</p>
+                        <div class="options">
+                            ${q.options.map((opt, optIndex) => `
+                                <div class="option">
+                                    <input type="radio" name="q${qIndex}" value="${optIndex}" id="q${qIndex}opt${optIndex}">
+                                    <label for="q${qIndex}opt${optIndex}">${opt}</label>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                    container.appendChild(questionDiv);
+                });
+            }
+
+            calculateScore() {
+                this.score = 0;
+                this.selectedQuestions.forEach((q, qIndex) => {
+                    const selected = document.querySelector(`input[name="q${qIndex}"]:checked`);
+                    if (selected && parseInt(selected.value) === q.correctOption) {
+                        this.score++;
+                    }
+                });
+                
+                const scoreDiv = document.getElementById('score');
+                scoreDiv.textContent = `Your Score: ${this.score}/${this.selectedQuestions.length}`;
+                scoreDiv.style.display = 'block';
+            }
+        }
+
+        const exam = new Examination();
+
+        document.getElementById('file-input').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                await exam.parseSpreadsheet(file);
+            }
+        });
+
+        document.getElementById('submit-btn').addEventListener('click', () => {
+            exam.calculateScore();
+        });
+    </script>
+</body>
+</html>
+
